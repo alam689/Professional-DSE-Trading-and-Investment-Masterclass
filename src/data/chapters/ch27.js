@@ -838,5 +838,929 @@ $$v = \\frac{210{,}000}{620{,}000} = 0.34$$
 
 আর লক্ষ করুন এখনো কী বাদ আছে: **ট্রেন্ড ও নিকটতম রেজিস্ট্যান্স স্তরের সাপেক্ষে ৫১.৮০ কোথায় বসে।** ধাপ ১–১৪-এর কিছুই তার উত্তর দেয় না, আর তা ছাড়া strong bullish body একটি ভালোভাবে-মাপা অজানা গুরুত্বের তথ্য মাত্র।`,
     },
+
+    excel: {
+      en: `\`\`\`
+A1:  — Candle Input (BDT) —
+A2:  Open                          B2:  48.20
+A3:  High                          B3:  52.10
+A4:  Low                           B4:  47.60
+A5:  Close                         B5:  51.80
+A6:  Volume (shares)               B6:  1850000
+A7:  20-day Average Volume         B7:  620000
+A8:  Previous Close                B8:  47.90
+A9:  Circuit Band (%)              B9:  10
+
+A11: — Geometry —
+A12: Total Range                   B12: =B3-B4
+A13: Body (absolute)               B13: =ABS(B5-B2)
+A14: Direction                     B14: =IF(B5>B2,"BULL",IF(B5<B2,"BEAR","FLAT"))
+A15: Body Top                      B15: =MAX(B2,B5)
+A16: Body Bottom                   B16: =MIN(B2,B5)
+A17: Upper Shadow                  B17: =B3-B15
+A18: Lower Shadow                  B18: =B16-B4
+
+A20: — Ratios —
+A21: Body % of Range               B21: =IF(B12=0,0,B13/B12*100)
+A22: Upper Shadow % of Range       B22: =IF(B12=0,0,B17/B12*100)
+A23: Lower Shadow % of Range       B23: =IF(B12=0,0,B18/B12*100)
+A24: Check (must total 100)        B24: =B21+B22+B23
+A25: Range as % of Close           B25: =B12/B5*100
+A26: Volume Ratio (x 20-day avg)   B26: =B6/B7
+
+A28: — DSE Validity Gates —
+A29: Upper Limit Price             B29: =B8*(1+B9/100)
+A30: Lower Limit Price             B30: =B8*(1-B9/100)
+A31: Limit Touched? (1=yes)        B31: =IF(OR(B3>=B29-0.005,B4<=B30+0.005),1,0)
+A32: Volume Adequate? (1=yes)      B32: =IF(B26>=0.5,1,0)
+A33: READABLE? (1=yes)             B33: =IF(B12=0,0,IF(AND(B31=1,B26<1),0,B32))
+
+A35: — Classification —
+A36: NAMED FORM
+B36: =IF(B12=0,"Four-price doji - non-observation",
+     IF(B21<=5, ...doji family, split by shadow symmetry...,
+     IF(B21>=90,"Marubozu",
+     IF(AND(B21<=35,B23>=55,B22<=15),"Hammer / Hanging Man - location decides",
+     IF(AND(B21<=35,B22>=55,B23<=15),"Shooting Star / Inverted Hammer - location decides",
+     IF(AND(B21<=35,B22>=20,B23>=20),"Spinning top",
+     IF(B21>=70,"Strong body","Indeterminate - no named form")))))))
+
+A38: VERDICT
+B38: =IF(B33=0,"DO NOT READ - zero range, limit-locked on thin volume, or volume too low",
+     IF(B31=1,"Shape reflects the price limit, not conviction - verify against the band",
+     IF(B26>=1.5,"Readable and volume-confirmed - now apply location (trend + level)",
+     "Readable but volume unremarkable - weight it lightly")))
+\`\`\`
+
+**On the Sunday candle this returns $b = 80.00$, $u = 6.67$, $l = 13.33$, check $= 100.00$, $v = 2.98$, Readable $= 1$, form "Strong bullish body", and the volume-confirmed verdict.** Re-key the Monday bar — 44.00 / 47.30 / 43.80 / 47.30 on 210,000 shares against a 43.00 previous close — and the same sheet returns $b = 94.29$ with **Readable $= 0$ and "DO NOT READ".**
+
+**Five design notes, and four of them are about ordering.**
+
+**B24 is not decoration and should never be deleted.** Body, upper shadow and lower shadow partition the range by construction, so the three percentages sum to exactly 100 for every candle that has ever traded. **If B24 returns anything else you have a data error — a high below the close, a low above the open — not an exotic candle.** Vendor feeds produce impossible OHLC rows more often than anyone admits, and this one cell catches all of them.
+
+**B21 through B23 are guarded with \`IF(B12=0,0,...)\` and the guard is doing real work.** A four-price doji has $R = 0$, and without the guard all three ratio cells return \`#DIV/0!\`, which then propagates into B24, B36 and B38 and takes the whole sheet down. **Zero range is not an error condition to be trapped — it is a legitimate and informative reading**, so the sheet must survive it and report it, which is exactly what the first branch of B36 does.
+
+**B33 is deliberately not \`AND(B31=0, B32=1)\`.** The rule is subtler: a limit-touched bar is discarded **only when volume is also thin** (\`AND(B31=1,B26<1)\`). A limit-up on three times average volume is a genuine event — real capital was absorbed at the ceiling — while a limit-up on a third of average volume is a handful of lots hitting an empty book. **Chapter 26's Day 2 and Day 3 are precisely this distinction, and a gate that rejected both would throw away the informative one.**
+
+**B36 tests in strict threshold order, and the order is load-bearing.** Zero range first, then the doji family at $b \\le 5$, then marubozu at $b \\ge 90$, then the small-body forms at $b \\le 35$ separated by shadow placement, and only then the $b \\ge 70$ strong-body catch. **Reverse any two of these and candles land in the wrong bucket** — test $b \\ge 70$ before $b \\ge 90$ and no marubozu is ever named, because every marubozu also satisfies the weaker condition.
+
+**One honest limitation.** B29 and B30 compute the band as a plain percentage of the previous close, without rounding to the tick. Chapter 26 showed why that matters: 47.90 × 1.10 = 52.69 is exactly quotable here, but a previous close of 54.50 gives 59.95, which is not, and the tradable ceiling is 59.90. **The ±0.005 tolerance in B31 is a crude substitute for proper tick rounding and it will miss locked sessions whose true band falls between ticks.** For production work, replace B29 with \`=FLOOR(B8*(1+B9/100),0.1)\` and B30 with \`=CEILING(B8*(1-B9/100),0.1)\`.`,
+      bn: `\`\`\`
+A1:  — Candle Input (BDT) —
+A2:  Open                          B2:  48.20
+A3:  High                          B3:  52.10
+A4:  Low                           B4:  47.60
+A5:  Close                         B5:  51.80
+A6:  Volume (shares)               B6:  1850000
+A7:  20-day Average Volume         B7:  620000
+A8:  Previous Close                B8:  47.90
+A9:  Circuit Band (%)              B9:  10
+
+A11: — Geometry —
+A12: Total Range                   B12: =B3-B4
+A13: Body (absolute)               B13: =ABS(B5-B2)
+A14: Direction                     B14: =IF(B5>B2,"BULL",IF(B5<B2,"BEAR","FLAT"))
+A15: Body Top                      B15: =MAX(B2,B5)
+A16: Body Bottom                   B16: =MIN(B2,B5)
+A17: Upper Shadow                  B17: =B3-B15
+A18: Lower Shadow                  B18: =B16-B4
+
+A20: — Ratios —
+A21: Body % of Range               B21: =IF(B12=0,0,B13/B12*100)
+A22: Upper Shadow % of Range       B22: =IF(B12=0,0,B17/B12*100)
+A23: Lower Shadow % of Range       B23: =IF(B12=0,0,B18/B12*100)
+A24: Check (must total 100)        B24: =B21+B22+B23
+A25: Range as % of Close           B25: =B12/B5*100
+A26: Volume Ratio (x 20-day avg)   B26: =B6/B7
+
+A28: — DSE Validity Gates —
+A29: Upper Limit Price             B29: =B8*(1+B9/100)
+A30: Lower Limit Price             B30: =B8*(1-B9/100)
+A31: Limit Touched? (1=yes)        B31: =IF(OR(B3>=B29-0.005,B4<=B30+0.005),1,0)
+A32: Volume Adequate? (1=yes)      B32: =IF(B26>=0.5,1,0)
+A33: READABLE? (1=yes)             B33: =IF(B12=0,0,IF(AND(B31=1,B26<1),0,B32))
+
+A35: — Classification —
+A36: NAMED FORM
+B36: =IF(B12=0,"Four-price doji - non-observation",
+     IF(B21<=5, ...doji পরিবার, শ্যাডো প্রতিসাম্যে ভাগ...,
+     IF(B21>=90,"Marubozu",
+     IF(AND(B21<=35,B23>=55,B22<=15),"Hammer / Hanging Man - location decides",
+     IF(AND(B21<=35,B22>=55,B23<=15),"Shooting Star / Inverted Hammer - location decides",
+     IF(AND(B21<=35,B22>=20,B23>=20),"Spinning top",
+     IF(B21>=70,"Strong body","Indeterminate - no named form")))))))
+
+A38: VERDICT
+B38: =IF(B33=0,"DO NOT READ - zero range, limit-locked on thin volume, or volume too low",
+     IF(B31=1,"Shape reflects the price limit, not conviction - verify against the band",
+     IF(B26>=1.5,"Readable and volume-confirmed - now apply location (trend + level)",
+     "Readable but volume unremarkable - weight it lightly")))
+\`\`\`
+
+**রবিবারের ক্যান্ডেলে এটি ফেরত দেয় $b = 80.00$, $u = 6.67$, $l = 13.33$, যাচাই $= 100.00$, $v = 2.98$, Readable $= 1$, রূপ "Strong bullish body", ও ভলিউম-নিশ্চিত রায়।** সোমবারের বারটি বসান — ৪৩.০০ আগের ক্লোজের বিপরীতে ২,১০,০০০ শেয়ারে ৪৪.০০ / ৪৭.৩০ / ৪৩.৮০ / ৪৭.৩০ — আর একই শিট ফেরত দেয় $b = 94.29$ সঙ্গে **Readable $= 0$ ও "DO NOT READ"।**
+
+**পাঁচটি নকশা টীকা, আর তার চারটিই ক্রম নিয়ে।**
+
+**B24 অলংকার নয় এবং কখনো মোছা উচিত নয়।** বডি, আপার শ্যাডো ও লোয়ার শ্যাডো গঠনগতভাবেই রেঞ্জকে বিভাজন করে, তাই কখনো লেনদেন হওয়া প্রতিটি ক্যান্ডেলে তিনটি শতাংশ ঠিক ১০০-তে যোগ হয়। **B24 অন্য কিছু ফেরত দিলে আপনার একটি ডেটা ভুল আছে — ক্লোজের নিচে হাই, ওপেনের ওপরে লো — কোনো বিরল ক্যান্ডেল নয়।** ভেন্ডর ফিড কেউ যত স্বীকার করে তার চেয়ে বেশি বার অসম্ভব OHLC সারি তৈরি করে, আর এই একটি সেল সেগুলো সব ধরে।
+
+**B21 থেকে B23 \`IF(B12=0,0,...)\` দিয়ে সুরক্ষিত আর সুরক্ষাটি প্রকৃত কাজ করছে।** চার-দামের doji-র $R = 0$, আর সুরক্ষা ছাড়া তিনটি অনুপাত সেলই \`#DIV/0!\` ফেরত দেয়, যা তারপর B24, B36 ও B38-এ ছড়িয়ে পুরো শিট ফেলে দেয়। **শূন্য রেঞ্জ ফাঁদে ফেলার মতো ভুল-অবস্থা নয় — এটি একটি বৈধ ও তথ্যবহুল পাঠ**, তাই শিটকে তা টিকিয়ে জানাতে হবে, যা B36-এর প্রথম শাখা ঠিক তাই করে।
+
+**B33 ইচ্ছাকৃতভাবে \`AND(B31=0, B32=1)\` নয়।** নিয়মটি সূক্ষ্মতর: সীমা-স্পর্শী বার বাতিল হয় **কেবল যখন ভলিউমও পাতলা** (\`AND(B31=1,B26<1)\`)। গড়ের তিন গুণ ভলিউমে limit-up একটি প্রকৃত ঘটনা — ছাদে প্রকৃত পুঁজি শোষিত হয়েছে — যেখানে গড়ের এক-তৃতীয়াংশে limit-up হলো খালি বইয়ে ঠেকা গুটিকয়েক লট। **অধ্যায় ২৬-এর দিন ২ ও দিন ৩ ঠিক এই পার্থক্য, আর যে গেট দুটোকেই বাতিল করত সে তথ্যবহুলটি ফেলে দিত।**
+
+**B36 কঠোর সীমা-ক্রমে পরীক্ষা করে, আর ক্রমটি ভারবাহী।** প্রথমে শূন্য রেঞ্জ, তারপর $b \\le 5$-এ doji পরিবার, তারপর $b \\ge 90$-এ marubozu, তারপর $b \\le 35$-এ ছোট-বডির রূপগুলো শ্যাডোর অবস্থান দিয়ে আলাদা, আর কেবল তারপর $b \\ge 70$ শক্তিশালী-বডির ধরা। **এদের যেকোনো দুটি উল্টালে ক্যান্ডেল ভুল বাক্সে পড়ে** — $b \\ge 90$-এর আগে $b \\ge 70$ পরীক্ষা করুন আর কোনো marubozu কখনো নাম পাবে না, কারণ প্রতিটি marubozu দুর্বলতর শর্তটিও পূরণ করে।
+
+**একটি সৎ সীমাবদ্ধতা।** B29 ও B30 ব্যান্ডটি আগের ক্লোজের সরল শতাংশ হিসেবে গণনা করে, টিকে গোল না করে। অধ্যায় ২৬ দেখিয়েছে কেন তা গুরুত্বপূর্ণ: এখানে ৪৭.৯০ × ১.১০ = ৫২.৬৯ ঠিক কোটযোগ্য, কিন্তু ৫৪.৫০ আগের ক্লোজ দেয় ৫৯.৯৫, যা নয়, আর লেনদেনযোগ্য ছাদ ৫৯.৯০। **B31-এর ±০.০০৫ সহনশীলতা যথাযথ টিক গোল করার একটি স্থূল বিকল্প আর তা এমন লক সেশন মিস করবে যাদের প্রকৃত ব্যান্ড দুই টিকের মাঝে পড়ে।** উৎপাদন কাজের জন্য B29-কে \`=FLOOR(B8*(1+B9/100),0.1)\` ও B30-কে \`=CEILING(B8*(1-B9/100),0.1)\` দিয়ে বদলান।`,
+    },
+
+    python: {
+      en: `\`\`\`python
+"""
+Chapter 27 — Single-candle anatomy for DSE bars.
+
+Decomposes a candle into body and shadows, gates it against the circuit band
+and volume, and only then attaches a name.
+Educational. Figures illustrative.
+"""
+from dataclasses import dataclass
+
+BAND = 0.10          # ±10% slab (Chapter 2)
+VOL_FLOOR = 0.50     # below half average volume, the bar is not a crowd
+VOL_CONFIRM = 1.50   # above this, the reading carries weight
+
+
+class ImpossibleCandle(ValueError):
+    """Raised when OHLC violates low <= min(O,C) <= max(O,C) <= high."""
+
+
+@dataclass
+class Candle:
+    """One session's four prices, plus the context needed to judge them."""
+    label: str
+    o: float
+    h: float
+    l: float
+    c: float
+    volume: int
+    avg_volume: float
+    prev_close: float
+
+    def __post_init__(self) -> None:
+        if not (self.l <= min(self.o, self.c) <= max(self.o, self.c) <= self.h):
+            raise ImpossibleCandle(
+                f"{self.label}: O={self.o} H={self.h} L={self.l} C={self.c}"
+            )
+
+    # --- geometry -------------------------------------------------------
+    @property
+    def rng(self) -> float:
+        return round(self.h - self.l, 2)
+
+    @property
+    def body(self) -> float:
+        return round(abs(self.c - self.o), 2)
+
+    @property
+    def upper(self) -> float:
+        return round(self.h - max(self.o, self.c), 2)
+
+    @property
+    def lower(self) -> float:
+        return round(min(self.o, self.c) - self.l, 2)
+
+    @property
+    def direction(self) -> str:
+        return "BULL" if self.c > self.o else "BEAR" if self.c < self.o else "FLAT"
+
+    # --- ratios ---------------------------------------------------------
+    def _pct(self, part: float) -> float:
+        return 0.0 if self.rng == 0 else part / self.rng * 100
+
+    @property
+    def b(self) -> float:
+        return self._pct(self.body)
+
+    @property
+    def u(self) -> float:
+        return self._pct(self.upper)
+
+    @property
+    def l_pct(self) -> float:
+        return self._pct(self.lower)
+
+    @property
+    def partition_check(self) -> float:
+        """Must equal 100.00 for any real candle with range > 0."""
+        return self.b + self.u + self.l_pct
+
+    @property
+    def rho(self) -> float:
+        """Range as a percentage of close — how big a day this was."""
+        return self.rng / self.c * 100
+
+    @property
+    def clv(self) -> float:
+        """Close location value: 0 = closed on the low, 1 = closed on the high."""
+        return 0.5 if self.rng == 0 else (self.c - self.l) / self.rng
+
+    @property
+    def v(self) -> float:
+        return self.volume / self.avg_volume
+
+    # --- DSE gates ------------------------------------------------------
+    @property
+    def limit_up(self) -> float:
+        return round(self.prev_close * (1 + BAND), 2)
+
+    @property
+    def limit_dn(self) -> float:
+        return round(self.prev_close * (1 - BAND), 2)
+
+    @property
+    def limit_touched(self) -> bool:
+        return self.h >= self.limit_up - 0.005 or self.l <= self.limit_dn + 0.005
+
+    @property
+    def headroom_pct(self) -> float:
+        """How far below the ceiling the high stopped, as % of the ceiling."""
+        return max(0.0, self.limit_up - self.h) / self.limit_up * 100
+
+    @property
+    def readable(self) -> bool:
+        """Zero range is never readable. A limit bar is readable only on volume."""
+        if self.rng == 0:
+            return False
+        if self.limit_touched and self.v < 1.0:
+            return False
+        return self.v >= VOL_FLOOR
+
+    # --- naming ---------------------------------------------------------
+    @property
+    def form(self) -> str:
+        """Thresholds tested in strict order — reversing any two misclassifies."""
+        if self.rng == 0:
+            return "Four-price doji - non-observation"
+        if self.b <= 5:
+            if self.u <= 10 and self.l_pct >= 60:
+                return "Dragonfly doji"
+            if self.l_pct <= 10 and self.u >= 60:
+                return "Gravestone doji"
+            if self.u >= 25 and self.l_pct >= 25:
+                return "Long-legged doji"
+            return "Standard doji"
+        if self.b >= 90:
+            return f"{'Bullish' if self.direction == 'BULL' else 'Bearish'} marubozu"
+        if self.b <= 35:
+            if self.l_pct >= 55 and self.u <= 15:
+                return "Hammer / Hanging Man - location decides"
+            if self.u >= 55 and self.l_pct <= 15:
+                return "Shooting Star / Inverted Hammer - location decides"
+            if self.u >= 20 and self.l_pct >= 20:
+                return "Spinning top"
+        if self.b >= 70:
+            return f"Strong {'bullish' if self.direction == 'BULL' else 'bearish'} body"
+        return "Indeterminate - no named form"
+
+    @property
+    def verdict(self) -> str:
+        if not self.readable:
+            return "DO NOT READ - zero range, limit-locked on thin volume, or volume too low"
+        if self.limit_touched:
+            return "Shape reflects the price limit, not conviction - verify against the band"
+        if self.v >= VOL_CONFIRM:
+            return "Readable and volume-confirmed - now apply location (trend + level)"
+        return "Readable but volume unremarkable - weight it lightly"
+
+
+if __name__ == "__main__":
+    candles = [
+        Candle("Sunday", 48.20, 52.10, 47.60, 51.80, 1_850_000, 620_000, 47.90),
+        Candle("Monday", 44.00, 47.30, 43.80, 47.30,   210_000, 620_000, 43.00),
+        Candle("Empty",  50.20, 50.20, 50.20, 50.20,     3_000, 620_000, 50.20),
+    ]
+
+    print(f"{'Bar':<8} {'Range':>6} {'b%':>7} {'u%':>6} {'l%':>6} {'Sum':>7} "
+          f"{'CLV':>6} {'v':>6} {'Lim':>4} {'Read':>5}")
+    print("-" * 72)
+    for k in candles:
+        print(f"{k.label:<8} {k.rng:>6.2f} {k.b:>7.2f} {k.u:>6.2f} {k.l_pct:>6.2f} "
+              f"{k.partition_check:>7.2f} {k.clv:>6.4f} {k.v:>6.2f} "
+              f"{'Y' if k.limit_touched else 'N':>4} {'Y' if k.readable else 'N':>5}")
+
+    print()
+    for k in candles:
+        print(f"{k.label}")
+        print(f"  Form     : {k.form}")
+        print(f"  Headroom : {k.headroom_pct:.2f}% below the ceiling ({k.limit_up:.2f})")
+        print(f"  Verdict  : {k.verdict}")
+
+    print()
+    print("=== Shape ranks them backwards; the gates rank them correctly ===")
+    for k in sorted(candles, key=lambda x: x.b, reverse=True):
+        print(f"  b={k.b:>6.2f}%  {k.label:<8} -> "
+              f"{'USABLE' if k.readable else 'DISCARD'}")
+
+    print()
+    try:
+        Candle("Bad feed", 48.00, 47.00, 46.00, 47.50, 100_000, 620_000, 47.00)
+    except ImpossibleCandle as e:
+        print(f"Rejected at construction: {e}")
+\`\`\`
+
+**Expected output:**
+\`\`\`
+Bar       Range      b%     u%     l%     Sum    CLV      v  Lim  Read
+------------------------------------------------------------------------
+Sunday     4.50   80.00   6.67  13.33  100.00 0.9333   2.98    N     Y
+Monday     3.50   94.29   0.00   5.71  100.00 1.0000   0.34    Y     N
+Empty      0.00    0.00   0.00   0.00    0.00 0.5000   0.00    Y     N
+
+Sunday
+  Form     : Strong bullish body
+  Headroom : 1.12% below the ceiling (52.69)
+  Verdict  : Readable and volume-confirmed - now apply location (trend + level)
+Monday
+  Form     : Bullish marubozu
+  Headroom : 0.00% below the ceiling (47.30)
+  Verdict  : DO NOT READ - zero range, limit-locked on thin volume, or volume too low
+Empty
+  Form     : Four-price doji - non-observation
+  Headroom : 4.75% below the ceiling (55.22)
+  Verdict  : DO NOT READ - zero range, limit-locked on thin volume, or volume too low
+
+=== Shape ranks them backwards; the gates rank them correctly ===
+  b= 94.29%  Monday   -> DISCARD
+  b= 80.00%  Sunday   -> USABLE
+  b=  0.00%  Empty    -> DISCARD
+
+Rejected at construction: Bad feed: O=48.0 H=47.0 L=46.0 C=47.5
+\`\`\`
+
+**Read the sorted block, because it is the chapter's argument in three lines.** Ranked by body ratio — the metric every candlestick text treats as conviction — **Monday's 94.29% beats Sunday's 80.00%.** Yet Monday is a limit-up on a third of average volume and carries no information at all, while Sunday stopped 1.12% short of a ceiling it was free to reach, on three times average volume. **The shape ranked them backwards. The gates ranked them correctly.**
+
+**Three implementation notes.**
+
+**\`__post_init__\` refuses to construct an impossible candle.** The chain $L \\le \\min(O,C) \\le \\max(O,C) \\le H$ holds for every bar that has ever traded, so a violation is a corrupt feed, not a rare pattern. **Validating at construction rather than at read time means the error surfaces at the row that caused it**, with its label attached, instead of as a nonsensical body ratio forty lines later.
+
+**\`clv\` returns 0.5 on a zero-range bar rather than raising.** There is no meaningful close location when high equals low, and 0.5 — dead centre — is the honest neutral. It never reaches a decision anyway, because \`readable\` has already returned \`False\`. **The alternative, letting it raise, would make one legitimate market state crash the report.**
+
+**\`form\` and \`readable\` are deliberately independent, and this is the design.** The Empty bar still gets named "Four-price doji - non-observation" and Monday still gets named "Bullish marubozu"; naming a candle is not the same as trusting it. **Fuse the two and you lose the diagnostic — you would no longer be able to show that the highest-conviction shape in the sample is the one you are throwing away.**`,
+      bn: `\`\`\`python
+"""
+অধ্যায় ২৭ — ডিএসই বারের একক-ক্যান্ডেল শারীরস্থান।
+
+একটি ক্যান্ডেলকে বডি ও শ্যাডোতে বিভাজন করে, সার্কিট ব্যান্ড ও ভলিউমের
+বিপরীতে গেট প্রয়োগ করে, আর কেবল তারপর একটি নাম দেয়।
+শিক্ষামূলক। সংখ্যা দৃষ্টান্তমূলক।
+"""
+from dataclasses import dataclass
+
+BAND = 0.10          # ±১০% স্ল্যাব (অধ্যায় ২)
+VOL_FLOOR = 0.50     # গড় ভলিউমের অর্ধেকের নিচে বারটি কোনো জনতা নয়
+VOL_CONFIRM = 1.50   # এর ওপরে পাঠটি ওজন বহন করে
+
+
+class ImpossibleCandle(ValueError):
+    """OHLC যখন low <= min(O,C) <= max(O,C) <= high লঙ্ঘন করে।"""
+
+
+@dataclass
+class Candle:
+    """একটি সেশনের চারটি দাম, এবং সেগুলো বিচারের জন্য প্রয়োজনীয় প্রেক্ষাপট।"""
+    label: str
+    o: float
+    h: float
+    l: float
+    c: float
+    volume: int
+    avg_volume: float
+    prev_close: float
+
+    def __post_init__(self) -> None:
+        if not (self.l <= min(self.o, self.c) <= max(self.o, self.c) <= self.h):
+            raise ImpossibleCandle(
+                f"{self.label}: O={self.o} H={self.h} L={self.l} C={self.c}"
+            )
+
+    # --- জ্যামিতি -------------------------------------------------------
+    @property
+    def rng(self) -> float:
+        return round(self.h - self.l, 2)
+
+    @property
+    def body(self) -> float:
+        return round(abs(self.c - self.o), 2)
+
+    @property
+    def upper(self) -> float:
+        return round(self.h - max(self.o, self.c), 2)
+
+    @property
+    def lower(self) -> float:
+        return round(min(self.o, self.c) - self.l, 2)
+
+    @property
+    def direction(self) -> str:
+        return "BULL" if self.c > self.o else "BEAR" if self.c < self.o else "FLAT"
+
+    # --- অনুপাত ---------------------------------------------------------
+    def _pct(self, part: float) -> float:
+        return 0.0 if self.rng == 0 else part / self.rng * 100
+
+    @property
+    def b(self) -> float:
+        return self._pct(self.body)
+
+    @property
+    def u(self) -> float:
+        return self._pct(self.upper)
+
+    @property
+    def l_pct(self) -> float:
+        return self._pct(self.lower)
+
+    @property
+    def partition_check(self) -> float:
+        """রেঞ্জ > ০ যেকোনো প্রকৃত ক্যান্ডেলে অবশ্যই ১০০.০০ হবে।"""
+        return self.b + self.u + self.l_pct
+
+    @property
+    def rho(self) -> float:
+        """ক্লোজের শতাংশ হিসেবে রেঞ্জ — দিনটি কত বড় ছিল।"""
+        return self.rng / self.c * 100
+
+    @property
+    def clv(self) -> float:
+        """ক্লোজ অবস্থান: ০ = লো-তে বন্ধ, ১ = হাই-তে বন্ধ।"""
+        return 0.5 if self.rng == 0 else (self.c - self.l) / self.rng
+
+    @property
+    def v(self) -> float:
+        return self.volume / self.avg_volume
+
+    # --- ডিএসই গেট ------------------------------------------------------
+    @property
+    def limit_up(self) -> float:
+        return round(self.prev_close * (1 + BAND), 2)
+
+    @property
+    def limit_dn(self) -> float:
+        return round(self.prev_close * (1 - BAND), 2)
+
+    @property
+    def limit_touched(self) -> bool:
+        return self.h >= self.limit_up - 0.005 or self.l <= self.limit_dn + 0.005
+
+    @property
+    def headroom_pct(self) -> float:
+        """হাই ছাদের কত নিচে থেমেছে, ছাদের শতাংশে।"""
+        return max(0.0, self.limit_up - self.h) / self.limit_up * 100
+
+    @property
+    def readable(self) -> bool:
+        """শূন্য রেঞ্জ কখনো পাঠযোগ্য নয়। সীমা-বার পাঠযোগ্য কেবল ভলিউমে।"""
+        if self.rng == 0:
+            return False
+        if self.limit_touched and self.v < 1.0:
+            return False
+        return self.v >= VOL_FLOOR
+
+    # --- নামকরণ ---------------------------------------------------------
+    @property
+    def form(self) -> str:
+        """সীমা কঠোর ক্রমে পরীক্ষিত — যেকোনো দুটি উল্টালে ভুল শ্রেণিবিভাজন।"""
+        if self.rng == 0:
+            return "Four-price doji - non-observation"
+        if self.b <= 5:
+            if self.u <= 10 and self.l_pct >= 60:
+                return "Dragonfly doji"
+            if self.l_pct <= 10 and self.u >= 60:
+                return "Gravestone doji"
+            if self.u >= 25 and self.l_pct >= 25:
+                return "Long-legged doji"
+            return "Standard doji"
+        if self.b >= 90:
+            return f"{'Bullish' if self.direction == 'BULL' else 'Bearish'} marubozu"
+        if self.b <= 35:
+            if self.l_pct >= 55 and self.u <= 15:
+                return "Hammer / Hanging Man - location decides"
+            if self.u >= 55 and self.l_pct <= 15:
+                return "Shooting Star / Inverted Hammer - location decides"
+            if self.u >= 20 and self.l_pct >= 20:
+                return "Spinning top"
+        if self.b >= 70:
+            return f"Strong {'bullish' if self.direction == 'BULL' else 'bearish'} body"
+        return "Indeterminate - no named form"
+
+    @property
+    def verdict(self) -> str:
+        if not self.readable:
+            return "DO NOT READ - zero range, limit-locked on thin volume, or volume too low"
+        if self.limit_touched:
+            return "Shape reflects the price limit, not conviction - verify against the band"
+        if self.v >= VOL_CONFIRM:
+            return "Readable and volume-confirmed - now apply location (trend + level)"
+        return "Readable but volume unremarkable - weight it lightly"
+
+
+if __name__ == "__main__":
+    candles = [
+        Candle("Sunday", 48.20, 52.10, 47.60, 51.80, 1_850_000, 620_000, 47.90),
+        Candle("Monday", 44.00, 47.30, 43.80, 47.30,   210_000, 620_000, 43.00),
+        Candle("Empty",  50.20, 50.20, 50.20, 50.20,     3_000, 620_000, 50.20),
+    ]
+
+    print(f"{'Bar':<8} {'Range':>6} {'b%':>7} {'u%':>6} {'l%':>6} {'Sum':>7} "
+          f"{'CLV':>6} {'v':>6} {'Lim':>4} {'Read':>5}")
+    print("-" * 72)
+    for k in candles:
+        print(f"{k.label:<8} {k.rng:>6.2f} {k.b:>7.2f} {k.u:>6.2f} {k.l_pct:>6.2f} "
+              f"{k.partition_check:>7.2f} {k.clv:>6.4f} {k.v:>6.2f} "
+              f"{'Y' if k.limit_touched else 'N':>4} {'Y' if k.readable else 'N':>5}")
+
+    print()
+    for k in candles:
+        print(f"{k.label}")
+        print(f"  Form     : {k.form}")
+        print(f"  Headroom : {k.headroom_pct:.2f}% below the ceiling ({k.limit_up:.2f})")
+        print(f"  Verdict  : {k.verdict}")
+
+    print()
+    print("=== Shape ranks them backwards; the gates rank them correctly ===")
+    for k in sorted(candles, key=lambda x: x.b, reverse=True):
+        print(f"  b={k.b:>6.2f}%  {k.label:<8} -> "
+              f"{'USABLE' if k.readable else 'DISCARD'}")
+
+    print()
+    try:
+        Candle("Bad feed", 48.00, 47.00, 46.00, 47.50, 100_000, 620_000, 47.00)
+    except ImpossibleCandle as e:
+        print(f"Rejected at construction: {e}")
+\`\`\`
+
+**প্রত্যাশিত আউটপুট:**
+\`\`\`
+Bar       Range      b%     u%     l%     Sum    CLV      v  Lim  Read
+------------------------------------------------------------------------
+Sunday     4.50   80.00   6.67  13.33  100.00 0.9333   2.98    N     Y
+Monday     3.50   94.29   0.00   5.71  100.00 1.0000   0.34    Y     N
+Empty      0.00    0.00   0.00   0.00    0.00 0.5000   0.00    Y     N
+
+Sunday
+  Form     : Strong bullish body
+  Headroom : 1.12% below the ceiling (52.69)
+  Verdict  : Readable and volume-confirmed - now apply location (trend + level)
+Monday
+  Form     : Bullish marubozu
+  Headroom : 0.00% below the ceiling (47.30)
+  Verdict  : DO NOT READ - zero range, limit-locked on thin volume, or volume too low
+Empty
+  Form     : Four-price doji - non-observation
+  Headroom : 4.75% below the ceiling (55.22)
+  Verdict  : DO NOT READ - zero range, limit-locked on thin volume, or volume too low
+
+=== Shape ranks them backwards; the gates rank them correctly ===
+  b= 94.29%  Monday   -> DISCARD
+  b= 80.00%  Sunday   -> USABLE
+  b=  0.00%  Empty    -> DISCARD
+
+Rejected at construction: Bad feed: O=48.0 H=47.0 L=46.0 C=47.5
+\`\`\`
+
+**সাজানো অংশটি পড়ুন, কারণ তিন লাইনে এটিই অধ্যায়ের যুক্তি।** বডি অনুপাতে সাজালে — যে পরিমাপকে প্রতিটি ক্যান্ডেলস্টিক বই দৃঢ়তা ধরে — **সোমবারের ৯৪.২৯% রবিবারের ৮০.০০%-কে হারায়।** অথচ সোমবার গড়ের এক-তৃতীয়াংশ ভলিউমে একটি limit-up আর তাতে কোনো তথ্যই নেই, যেখানে রবিবার তিন গুণ ভলিউমে এমন একটি ছাদের ১.১২% আগে থেমেছে যেখানে পৌঁছাতে সে স্বাধীন ছিল। **আকৃতি এদের উল্টো ক্রমে রেখেছে। গেটগুলো সঠিক ক্রমে রেখেছে।**
+
+**তিনটি বাস্তবায়ন টীকা।**
+
+**\`__post_init__\` একটি অসম্ভব ক্যান্ডেল তৈরি করতে অস্বীকার করে।** $L \\le \\min(O,C) \\le \\max(O,C) \\le H$ শৃঙ্খলটি কখনো লেনদেন হওয়া প্রতিটি বারে সত্য, তাই লঙ্ঘন মানে দূষিত ফিড, বিরল প্যাটার্ন নয়। **পড়ার সময়ের বদলে নির্মাণের সময় যাচাই করার অর্থ ভুলটি যে সারি তা ঘটিয়েছে সেখানেই প্রকাশ পায়**, লেবেলসহ, চল্লিশ লাইন পরে একটি অর্থহীন বডি অনুপাত হিসেবে নয়।
+
+**শূন্য-রেঞ্জ বারে \`clv\` ব্যতিক্রম না তুলে ০.৫ ফেরত দেয়।** হাই ও লো সমান হলে অর্থবহ কোনো ক্লোজ অবস্থান নেই, আর ০.৫ — ঠিক মাঝখান — সৎ নিরপেক্ষ মান। এটি কোনোভাবেই সিদ্ধান্তে পৌঁছায় না, কারণ \`readable\` ইতিমধ্যেই \`False\` ফেরত দিয়েছে। **বিকল্প, অর্থাৎ ব্যতিক্রম তুলতে দেওয়া, একটি বৈধ বাজার-অবস্থা দিয়ে পুরো প্রতিবেদন ভেঙে দিত।**
+
+**\`form\` ও \`readable\` ইচ্ছাকৃতভাবে স্বাধীন, আর এটিই নকশা।** Empty বারটি তবুও "Four-price doji - non-observation" নাম পায় ও সোমবার তবুও "Bullish marubozu" নাম পায়; একটি ক্যান্ডেলের নাম দেওয়া আর তাকে বিশ্বাস করা এক নয়। **দুটি মিলিয়ে দিলে নির্ণায়কটি হারাবেন — আপনি আর দেখাতে পারবেন না যে নমুনার সর্বোচ্চ-দৃঢ়তার আকৃতিটিই আপনি ফেলে দিচ্ছেন।**`,
+    },
+
+    mistakes: {
+      en: `1. **Naming a candle before gating it.** The whole failure this chapter exists to prevent. Monday's bar is a textbook bullish marubozu at $b = 94.29\\%$ and it is worth nothing, because it is a limit-up on a third of average volume.
+2. **Treating the body ratio as conviction without checking headroom.** A $b$ of 94% produced against a circuit ceiling is a measurement of the band. **Conviction requires that the price was free to go further and chose not to** — which is what Sunday's 1.12% of unused headroom demonstrates and Monday's 0.00% does not.
+3. **Skipping the partition check.** Body + upper + lower must equal the range for every bar that has ever traded. When the three percentages do not sum to 100, you have a corrupt OHLC row, and vendor feeds produce them more often than anyone admits.
+4. **Reading a four-price doji as indecision.** Zero range is a non-observation. It is either a limit lock or an empty book, and Chapter 26 showed those mean opposite things. Neither is a balanced auction.
+5. **Testing the classification thresholds in the wrong order.** Every marubozu also satisfies $b \\ge 70$. Test the strong-body condition first and no marubozu is ever named — a silent misclassification that produces plausible output.
+6. **Calling a hammer a hammer with no location.** The identical geometry is a hammer after a decline and a hanging man after an advance. **The shape does not carry the name; the trend does.** Same for shooting star versus inverted hammer.
+7. **Discarding every limit-touched bar.** A limit-up on three times average volume absorbed real capital and is informative. Only the thin-volume limit bar is a non-observation, which is why the gate is \`AND(limit, v < 1)\` rather than \`limit\` alone.
+8. **Ignoring the open because "only the close matters."** The close is the price that survives — it sets tomorrow's band, marks portfolios and strikes NAV — but the body is defined by *both*, and the open records the overnight consensus formed with no ability to trade on it.
+9. **Reading the high and low as agreed prices.** They are failure points: the high is where buying exhausted itself, the low where selling did. A long upper shadow records buyers reaching a price and being unable to hold it.
+10. **Acting on a single candle at all.** Nothing in this chapter is a signal. A candle is one observation; Chapters 28 and 29 add sequence and Chapter 30 adds location, and only the combination reaches a decision.`,
+      bn: `১. **গেট প্রয়োগের আগে ক্যান্ডেলের নাম দেওয়া।** এই ব্যর্থতা ঠেকাতেই অধ্যায়টির অস্তিত্ব। সোমবারের বারটি $b = 94.29\\%$-এ পাঠ্যবইয়ের bullish marubozu আর তার কোনো মূল্য নেই, কারণ তা গড়ের এক-তৃতীয়াংশ ভলিউমে একটি limit-up।
+২. **ফাঁক না দেখে বডি অনুপাতকে দৃঢ়তা ধরা।** সার্কিট ছাদের বিপরীতে তৈরি ৯৪% $b$ ব্যান্ডের একটি পরিমাপ। **দৃঢ়তার জন্য দরকার দাম আরও যেতে স্বাধীন ছিল ও যায়নি** — যা রবিবারের ১.১২% অব্যবহৃত ফাঁক দেখায় আর সোমবারের ০.০০% দেখায় না।
+৩. **বিভাজন যাচাই এড়ানো।** কখনো লেনদেন হওয়া প্রতিটি বারে বডি + আপার + লোয়ার রেঞ্জের সমান হতে হবে। তিনটি শতাংশ ১০০-তে যোগ না হলে আপনার একটি দূষিত OHLC সারি আছে, আর ভেন্ডর ফিড কেউ যত স্বীকার করে তার চেয়ে বেশি বার তা তৈরি করে।
+৪. **চার-দামের doji-কে দ্বিধা হিসেবে পড়া।** শূন্য রেঞ্জ একটি অ-পর্যবেক্ষণ। এটি হয় সীমা-লক নয়তো খালি বই, আর অধ্যায় ২৬ দেখিয়েছে ঐ দুটির অর্থ বিপরীত। কোনোটিই ভারসাম্যপূর্ণ নিলাম নয়।
+৫. **শ্রেণিবিভাজনের সীমা ভুল ক্রমে পরীক্ষা করা।** প্রতিটি marubozu $b \\ge 70$-ও পূরণ করে। শক্তিশালী-বডির শর্ত আগে পরীক্ষা করুন আর কোনো marubozu কখনো নাম পাবে না — একটি নীরব ভুল শ্রেণিবিভাজন যা বিশ্বাসযোগ্য আউটপুট তৈরি করে।
+৬. **অবস্থান ছাড়া hammer-কে hammer বলা।** অভিন্ন জ্যামিতি পতনের পরে hammer আর উত্থানের পরে hanging man। **আকৃতি নামটি বহন করে না; ট্রেন্ড করে।** shooting star বনাম inverted hammer-এর ক্ষেত্রেও একই।
+৭. **প্রতিটি সীমা-স্পর্শী বার বাতিল করা।** গড়ের তিন গুণ ভলিউমে limit-up প্রকৃত পুঁজি শোষণ করেছে ও তথ্যবহুল। কেবল পাতলা-ভলিউমের সীমা-বারই অ-পর্যবেক্ষণ, আর সেজন্যই গেটটি কেবল \`limit\` নয়, \`AND(limit, v < 1)\`।
+৮. **"কেবল ক্লোজই গুরুত্বপূর্ণ" বলে ওপেন উপেক্ষা করা।** ক্লোজ সেই দাম যা টিকে থাকে — আগামীকালের ব্যান্ড ঠিক করে, পোর্টফোলিও চিহ্নিত করে ও NAV নির্ধারণ করে — কিন্তু বডি *দুটো* দিয়েই সংজ্ঞায়িত, আর ওপেন লিপিবদ্ধ করে রাতের ঐকমত্য যা তার ওপর লেনদেনের সুযোগ ছাড়াই গড়ে উঠেছে।
+৯. **হাই ও লো-কে সম্মত দাম হিসেবে পড়া।** এগুলো ব্যর্থতার বিন্দু: হাই যেখানে ক্রয় নিজেকে নিঃশেষ করেছে, লো যেখানে বিক্রয়। লম্বা আপার শ্যাডো লিপিবদ্ধ করে ক্রেতারা একটি দামে পৌঁছে তা ধরে রাখতে পারেননি।
+১০. **আদৌ একটি একক ক্যান্ডেলে কাজ করা।** এই অধ্যায়ের কিছুই সংকেত নয়। ক্যান্ডেল একটি পর্যবেক্ষণ; অধ্যায় ২৮ ও ২৯ ক্রম যোগ করে আর অধ্যায় ৩০ অবস্থান, আর কেবল সমন্বয়ই সিদ্ধান্তে পৌঁছায়।`,
+    },
+
+    tips: {
+      en: `- **Compute the three ratios before you look at the picture.** The eye reads a long body as conviction whether or not the arithmetic supports it. Reading $b = 80\\%$ off a cell is a fact; "that looks strong" is an impression you will defend after the trade goes wrong.
+- **Always report headroom next to the body ratio.** "$b = 80\\%$, 1.12% below the ceiling" is a complete statement. "$b = 94\\%$" on its own conceals that the price could not have gone further.
+- **Keep the partition check permanently in your sheet.** One cell, and it catches every corrupt OHLC row your data vendor sends you. This is the candle-level equivalent of Chapter 26's additivity check.
+- **Set the volume ratio against a 20-day average, not against yesterday.** A single quiet session makes any bar look heavy. The 20-day base is what makes $v = 2.98$ a meaningful statement about participation rather than a comparison with one arbitrary day.
+- **Name the form and record the gate result separately.** Keep both columns. The pairing — "bullish marubozu, DO NOT READ" — is where the learning is, and fusing them destroys the very diagnostic that shows why shape alone misleads.
+- **When a hammer appears, write down the trend before you write down the name.** If you cannot state what preceded it, you cannot distinguish hammer from hanging man, and the geometry is identical. **Location is not a refinement of the name; it is half of it.**
+- **Treat $b$ between 35% and 70% as genuinely unnamed and be comfortable there.** Most sessions are indeterminate. A vocabulary that finds a named pattern every day is a vocabulary with thresholds too loose to mean anything.
+- **Use tick-rounded bands in production**, per Chapter 26 — \`FLOOR(prev*1.1, 0.1)\` and \`CEILING(prev*0.9, 0.1)\`. The ±0.005 tolerance in the teaching sheet will miss locks whose true band falls between ticks.
+- **Never let a single candle size a position.** This chapter produces an observation with a confidence weight attached. Sizing needs Chapter 39's ATR and Part IV's risk rules, and a candle that reaches the order screen on its own has skipped both.`,
+      bn: `- **ছবিটি দেখার আগে তিনটি অনুপাত গণনা করুন।** পাটিগণিত সমর্থন করুক বা না করুক, চোখ লম্বা বডিকে দৃঢ়তা হিসেবে পড়ে। একটি সেল থেকে $b = 80\\%$ পড়া একটি তথ্য; "ওটা শক্তিশালী দেখাচ্ছে" একটি ধারণা যা ট্রেড খারাপ হওয়ার পর আপনি সমর্থন করবেন।
+- **বডি অনুপাতের পাশে সবসময় ফাঁক জানান।** "$b = 80\\%$, ছাদের ১.১২% নিচে" একটি সম্পূর্ণ বিবৃতি। একা "$b = 94\\%$" আড়াল করে যে দাম আরও যেতে পারত না।
+- **বিভাজন যাচাই শিটে স্থায়ীভাবে রাখুন।** একটি সেল, আর তা আপনার ডেটা ভেন্ডরের পাঠানো প্রতিটি দূষিত OHLC সারি ধরে। এটি অধ্যায় ২৬-এর যোগশীলতা যাচাইয়ের ক্যান্ডেল-স্তরের সমতুল্য।
+- **ভলিউম অনুপাত গতকালের নয়, ২০-দিনের গড়ের বিপরীতে নির্ধারণ করুন।** একটি শান্ত সেশনই যেকোনো বারকে ভারী দেখায়। ২০-দিনের ভিত্তিই $v = 2.98$-কে একটি যথেচ্ছ দিনের সঙ্গে তুলনা না রেখে অংশগ্রহণ সম্পর্কে অর্থবহ বিবৃতি করে।
+- **রূপের নাম ও গেটের ফলাফল আলাদাভাবে লিপিবদ্ধ করুন।** দুটি কলামই রাখুন। জোড়াটি — "bullish marubozu, DO NOT READ" — সেখানেই শিক্ষা, আর মিলিয়ে দিলে ঠিক সেই নির্ণায়কটিই ধ্বংস হয় যা দেখায় কেন কেবল আকৃতি বিভ্রান্ত করে।
+- **hammer দেখা দিলে নাম লেখার আগে ট্রেন্ড লিখুন।** এর আগে কী ছিল বলতে না পারলে hammer ও hanging man আলাদা করতে পারবেন না, আর জ্যামিতি অভিন্ন। **অবস্থান নামের পরিমার্জন নয়; নামের অর্ধেক।**
+- **৩৫% ও ৭০%-এর মাঝের $b$-কে সত্যিই নামহীন ধরুন এবং তাতে স্বচ্ছন্দ থাকুন।** বেশিরভাগ সেশনই অনির্দিষ্ট। যে শব্দভাণ্ডার প্রতিদিন একটি নামযুক্ত প্যাটার্ন খুঁজে পায় তার সীমা কিছু বোঝানোর পক্ষে অতিরিক্ত ঢিলে।
+- **উৎপাদনে টিক-গোল করা ব্যান্ড ব্যবহার করুন**, অধ্যায় ২৬ অনুযায়ী — \`FLOOR(prev*1.1, 0.1)\` ও \`CEILING(prev*0.9, 0.1)\`। শিক্ষণ শিটের ±০.০০৫ সহনশীলতা এমন লক মিস করবে যাদের প্রকৃত ব্যান্ড দুই টিকের মাঝে পড়ে।
+- **কখনো একটি একক ক্যান্ডেলকে পজিশনের আকার ঠিক করতে দেবেন না।** এই অধ্যায় একটি আস্থার ওজনসহ পর্যবেক্ষণ তৈরি করে। সাইজিংয়ের জন্য অধ্যায় ৩৯-এর ATR ও চতুর্থ খণ্ডের ঝুঁকি নিয়ম লাগে, আর যে ক্যান্ডেল একা অর্ডার স্ক্রিনে পৌঁছায় সে দুটোই এড়িয়েছে।`,
+    },
+
+    exercises: {
+      en: `1. Build the §27.6 sheet. Enter the Sunday candle and confirm you reproduce $b = 80.00$, $u = 6.67$, $l = 13.33$, check $= 100.00$, $v = 2.98$ and "Strong bullish body".
+2. Re-key the Monday limit-up bar into the same sheet. Confirm $b = 94.29$ and Readable $= 0$. Write one sentence explaining why the higher body ratio is worth less.
+3. Pull 30 sessions of any DSE name. Compute $b$, $u$, $l$ and the partition check for every bar. Did the check ever fail? If so, look up that session on dsebd.org and identify what was wrong.
+4. In the same 30 sessions, count how many bars land in each named form and how many are "Indeterminate". If fewer than half are indeterminate, your thresholds are too loose — tighten them and re-run.
+5. Find a bar in your data with $b \\ge 90\\%$. Compute its headroom below the circuit ceiling and its volume ratio. Is it conviction or is it the band?
+6. Find two bars with near-identical geometry — one after a decline, one after an advance. Name them correctly. What, precisely, changed the name?
+7. Change the classification order in your sheet so $b \\ge 70$ is tested before $b \\ge 90$. Re-run the 30 sessions. How many marubozu did you just lose?
+8. Replace B29 and B30 with the tick-rounded versions from Chapter 26. On a name priced above 50, how many additional limit-locked sessions does the detector now catch?
+9. Take the four-price doji from your data, if you have one. Look up its volume and its distance from both bands. Classify it as a limit lock or an empty book, and state the evidence.
+10. For every bar in your 30 sessions with $v \\ge 2.0$, record what the next three sessions did. Is a high-volume strong body followed by continuation more often than not? Count the failures, and report the fraction rather than the impression.
+11. In three sentences, write down what a single candle cannot tell you, however carefully measured. Keep it with the sheet.`,
+      bn: `১. §২৭.৬-এর শিট তৈরি করুন। রবিবারের ক্যান্ডেল বসান ও নিশ্চিত করুন আপনি $b = 80.00$, $u = 6.67$, $l = 13.33$, যাচাই $= 100.00$, $v = 2.98$ ও "Strong bullish body" পুনরুৎপাদন করছেন।
+২. একই শিটে সোমবারের limit-up বারটি বসান। $b = 94.29$ ও Readable $= 0$ নিশ্চিত করুন। উচ্চতর বডি অনুপাতের মূল্য কম কেন এক বাক্যে লিখুন।
+৩. যেকোনো ডিএসই নামের ৩০টি সেশন নিন। প্রতিটি বারের $b$, $u$, $l$ ও বিভাজন যাচাই গণনা করুন। যাচাইটি কি কখনো ব্যর্থ হয়েছে? হলে dsebd.org-এ ঐ সেশন দেখে কী ভুল ছিল শনাক্ত করুন।
+৪. একই ৩০ সেশনে গুনুন কতগুলো বার প্রতিটি নামযুক্ত রূপে পড়ে আর কতগুলো "Indeterminate"। অর্ধেকের কম অনির্দিষ্ট হলে আপনার সীমা অতিরিক্ত ঢিলে — শক্ত করে আবার চালান।
+৫. আপনার ডেটায় $b \\ge 90\\%$ একটি বার খুঁজুন। সার্কিট ছাদের নিচে তার ফাঁক ও ভলিউম অনুপাত গণনা করুন। এটি কি দৃঢ়তা নাকি ব্যান্ড?
+৬. প্রায়-অভিন্ন জ্যামিতির দুটি বার খুঁজুন — একটি পতনের পর, একটি উত্থানের পর। সঠিকভাবে নাম দিন। ঠিক কী নামটি বদলাল?
+৭. আপনার শিটে শ্রেণিবিভাজনের ক্রম বদলে $b \\ge 90$-এর আগে $b \\ge 70$ পরীক্ষা করান। ৩০ সেশন আবার চালান। আপনি এইমাত্র কতগুলো marubozu হারালেন?
+৮. B29 ও B30-কে অধ্যায় ২৬-এর টিক-গোল করা সংস্করণ দিয়ে বদলান। ৫০-এর ওপরে দামের একটি নামে ডিটেক্টর এখন অতিরিক্ত কতগুলো সীমা-লক সেশন ধরে?
+৯. আপনার ডেটায় চার-দামের doji থাকলে তা নিন। এর ভলিউম ও দুটি ব্যান্ড থেকে দূরত্ব দেখুন। একে সীমা-লক না খালি বই হিসেবে শ্রেণিবদ্ধ করুন, ও প্রমাণ বলুন।
+১০. আপনার ৩০ সেশনের $v \\ge 2.0$ প্রতিটি বারের জন্য পরের তিনটি সেশন কী করল লিপিবদ্ধ করুন। উচ্চ-ভলিউমের শক্তিশালী বডির পরে কি ধারাবাহিকতা বেশিরভাগ সময়েই আসে? ব্যর্থতাগুলো গুনুন, আর ধারণা নয় ভগ্নাংশটি জানান।
+১১. তিন বাক্যে লিখুন যত সাবধানেই মাপা হোক একটি একক ক্যান্ডেল আপনাকে কী বলতে পারে না। শিটের সঙ্গে রেখে দিন।`,
+    },
+
+    summary: {
+      en: `- **A candle is four numbers and nothing more.** Everything read out of it must be derivable from those four plus context. Treating it as a picture with a mood is the failure this chapter exists to prevent.
+- The four are not equal in weight. **The close is the only one that survives the day** — it sets tomorrow's circuit band, marks portfolios, strikes NAV and computes margin calls. **No institution is marked at the day's high.** The high and low are not consensus prices at all; they are **failure points**, where one side stopped being able to push.
+- **Body + upper shadow + lower shadow = range, always.** If the three percentages do not sum to 100, you have a corrupt OHLC row, not an exotic candle. Keep that check in every sheet.
+- The named forms are threshold definitions, **tested in strict order**: zero range, then doji at $b \\le 5$, then marubozu at $b \\ge 90$, then the small-body forms at $b \\le 35$ split by shadow placement, then strong body at $b \\ge 70$. **Reverse any two and candles land in the wrong bucket** — every marubozu also satisfies $b \\ge 70$.
+- **Two DSE gates run before any name is attached.** A zero-range bar is a non-observation. A limit-touched bar is discarded **only when volume is also thin** — a limit-up on three times average volume absorbed real capital and is informative, which is Chapter 26's Day 2 versus Day 3 distinction.
+- The worked pair is the whole argument: **Sunday reads $b = 80.00\\%$ on $v = 2.98\\times$, stopping 1.12% below a ceiling it was free to reach. Monday reads $b = 94.29\\%$ on $v = 0.34\\times$, locked at the ceiling.** Ranked by body ratio, Monday wins. Ranked by information, Monday is worth nothing. **Shape ranked them backwards; the gates ranked them correctly.**
+- **Conviction is not a large body. Conviction is a large body plus proof that the price was free to go further and chose not to** — which is what unused headroom measures and a limit lock cannot.
+- **Location is half the name.** The identical geometry is a hammer after a decline and a hanging man after an advance. A shape named without its trend has not been identified.
+- **Discipline established:** compute the ratios before looking at the picture, report headroom beside the body ratio, keep the form and the gate result in separate columns, and accept that most sessions are genuinely unnamed. **A single candle is one observation with a confidence weight — never a signal, and never a position size.**`,
+      bn: `- **একটি ক্যান্ডেল চারটি সংখ্যা, এর বেশি কিছু নয়।** এ থেকে পড়া সবকিছু ঐ চারটি ও প্রেক্ষাপট থেকে নিষ্কাশনযোগ্য হতে হবে। একে মেজাজসহ একটি ছবি ভাবাই সেই ব্যর্থতা যা ঠেকাতে অধ্যায়টির অস্তিত্ব।
+- চারটির ওজন সমান নয়। **ক্লোজই একমাত্র যা দিনটি পেরিয়ে টেকে** — এটি আগামীকালের সার্কিট ব্যান্ড ঠিক করে, পোর্টফোলিও চিহ্নিত করে, NAV নির্ধারণ করে ও মার্জিন কল গণনা করে। **কোনো প্রতিষ্ঠান দিনের হাই-তে চিহ্নিত হয় না।** হাই ও লো আদৌ ঐকমত্যের দাম নয়; এগুলো **ব্যর্থতার বিন্দু**, যেখানে এক পক্ষ আর ঠেলতে পারেনি।
+- **বডি + আপার শ্যাডো + লোয়ার শ্যাডো = রেঞ্জ, সবসময়।** তিনটি শতাংশ ১০০-তে যোগ না হলে আপনার একটি দূষিত OHLC সারি আছে, কোনো বিরল ক্যান্ডেল নয়। এই যাচাই প্রতিটি শিটে রাখুন।
+- নামযুক্ত রূপগুলো সীমার সংজ্ঞা, **কঠোর ক্রমে পরীক্ষিত**: শূন্য রেঞ্জ, তারপর $b \\le 5$-এ doji, তারপর $b \\ge 90$-এ marubozu, তারপর $b \\le 35$-এ ছোট-বডির রূপগুলো শ্যাডোর অবস্থানে ভাগ, তারপর $b \\ge 70$-এ শক্তিশালী বডি। **যেকোনো দুটি উল্টালে ক্যান্ডেল ভুল বাক্সে পড়ে** — প্রতিটি marubozu $b \\ge 70$-ও পূরণ করে।
+- **কোনো নাম দেওয়ার আগে দুটি ডিএসই গেট চলে।** শূন্য-রেঞ্জ বার একটি অ-পর্যবেক্ষণ। সীমা-স্পর্শী বার বাতিল হয় **কেবল যখন ভলিউমও পাতলা** — গড়ের তিন গুণ ভলিউমে limit-up প্রকৃত পুঁজি শোষণ করেছে ও তথ্যবহুল, যা অধ্যায় ২৬-এর দিন ২ বনাম দিন ৩ পার্থক্য।
+- উদাহরণ জোড়াটিই পুরো যুক্তি: **রবিবার $v = 2.98\\times$-এ $b = 80.00\\%$ পড়ে, এমন একটি ছাদের ১.১২% নিচে থেমে যেখানে পৌঁছাতে সে স্বাধীন ছিল। সোমবার $v = 0.34\\times$-এ $b = 94.29\\%$ পড়ে, ছাদে লক।** বডি অনুপাতে সাজালে সোমবার জেতে। তথ্যে সাজালে সোমবারের কোনো মূল্য নেই। **আকৃতি এদের উল্টো ক্রমে রেখেছে; গেটগুলো সঠিক ক্রমে রেখেছে।**
+- **দৃঢ়তা মানে বড় বডি নয়। দৃঢ়তা মানে বড় বডি এবং সেইসঙ্গে প্রমাণ যে দাম আরও যেতে স্বাধীন ছিল ও যায়নি** — যা অব্যবহৃত ফাঁক মাপে আর একটি সীমা-লক পারে না।
+- **অবস্থান নামের অর্ধেক।** অভিন্ন জ্যামিতি পতনের পরে hammer আর উত্থানের পরে hanging man। ট্রেন্ড ছাড়া নাম দেওয়া আকৃতি শনাক্ত হয়নি।
+- **প্রতিষ্ঠিত শৃঙ্খলা:** ছবি দেখার আগে অনুপাত গণনা করুন, বডি অনুপাতের পাশে ফাঁক জানান, রূপ ও গেটের ফলাফল আলাদা কলামে রাখুন, আর মেনে নিন বেশিরভাগ সেশন সত্যিই নামহীন। **একটি একক ক্যান্ডেল একটি আস্থার ওজনসহ একটি পর্যবেক্ষণ — কখনো সংকেত নয়, আর কখনো পজিশনের আকার নয়।**`,
+    },
   },
+
+  interview: [
+    {
+      q: {
+        en: 'Of the four OHLC prices, which carries the most weight, and why?',
+        bn: 'OHLC-এর চারটি দামের মধ্যে কোনটি সবচেয়ে বেশি ওজন বহন করে, এবং কেন?',
+      },
+      a: {
+        en: 'The close, and the reason is institutional rather than aesthetic. It is the only one of the four that survives the session: it becomes the previous close, which sets tomorrow\'s circuit band; portfolios are marked at it, mutual fund NAV is struck on it, margin calls are computed from it, and index levels use it. No institution is ever marked at the day\'s high. That asymmetry is why candlestick analysis privileges the open-to-close relationship, which is the body, over the high-to-low relationship, which is the range. I would add a point about the other two that gets missed. The high and low are not prices anyone agreed on at all — they are the two points at which one side stopped being able to push. The high is where buying exhausted itself and the low is where selling did. So a long upper shadow is not a record of strength that faded; it is a record of buyers reaching a price and being unable to hold it, which is a different and more useful reading.',
+        bn: 'ক্লোজ, আর কারণটি নান্দনিক নয়, প্রাতিষ্ঠানিক। চারটির মধ্যে এটিই একমাত্র যা সেশন পেরিয়ে টেকে: এটি আগের ক্লোজ হয়, যা আগামীকালের সার্কিট ব্যান্ড ঠিক করে; পোর্টফোলিও এতে চিহ্নিত হয়, মিউচুয়াল ফান্ডের NAV এতে নির্ধারিত হয়, মার্জিন কল এ থেকে গণিত হয়, আর সূচকের স্তর এটি ব্যবহার করে। কোনো প্রতিষ্ঠান কখনো দিনের হাই-তে চিহ্নিত হয় না। এই অসাম্যই কারণ যে ক্যান্ডেলস্টিক বিশ্লেষণ হাই-থেকে-লো সম্পর্কের, অর্থাৎ রেঞ্জের, চেয়ে ওপেন-থেকে-ক্লোজ সম্পর্ককে, অর্থাৎ বডিকে, প্রাধান্য দেয়। বাকি দুটি নিয়ে একটি কথা যোগ করব যা প্রায়ই বাদ পড়ে। হাই ও লো আদৌ এমন দাম নয় যাতে কেউ সম্মত হয়েছেন — এগুলো সেই দুটি বিন্দু যেখানে এক পক্ষ আর ঠেলতে পারেনি। হাই যেখানে ক্রয় নিজেকে নিঃশেষ করেছে আর লো যেখানে বিক্রয়। তাই লম্বা আপার শ্যাডো ম্লান হয়ে যাওয়া শক্তির নথি নয়; এটি ক্রেতাদের একটি দামে পৌঁছে তা ধরে রাখতে না পারার নথি, যা একটি ভিন্ন ও বেশি কার্যকর পাঠ।',
+      },
+    },
+    {
+      q: {
+        en: 'Two up-days: one has a body ratio of 94% and one has 80%. Which is the stronger signal?',
+        bn: 'দুটি ঊর্ধ্বমুখী দিন: একটির বডি অনুপাত ৯৪% ও অন্যটির ৮০%। কোনটি শক্তিশালী সংকেত?',
+      },
+      a: {
+        en: 'On the numbers alone I cannot answer, and that is the point of the question. In the worked case the ninety-four percent bar is worth nothing and the eighty percent bar carries all the information. The ninety-four percent bar closed at its circuit ceiling on two hundred and ten thousand shares against a six hundred and twenty thousand average — a third of normal volume. Its body is large because the exchange stopped the price, not because buyers overwhelmed sellers, and a handful of lots hitting an empty book will produce that shape reliably. The eighty percent bar traded one point eight five million shares, nearly three times average, and stopped one point one two percent below a ceiling it was entirely free to reach. That gap is the evidence that matters: the price could have gone further and did not, which makes the shape a decision rather than an artefact. So my answer is that a body ratio is not conviction on its own. Conviction is a large body plus unused headroom plus volume, and if I am given only the first of the three I would ask for the other two before ranking anything.',
+        bn: 'কেবল সংখ্যায় আমি উত্তর দিতে পারি না, আর প্রশ্নটির উদ্দেশ্যই তা। উদাহরণে চুরানব্বই শতাংশের বারটির কোনো মূল্য নেই আর আশি শতাংশের বারটি সব তথ্য বহন করে। চুরানব্বই শতাংশের বারটি ছয় লক্ষ কুড়ি হাজার গড়ের বিপরীতে দুই লক্ষ দশ হাজার শেয়ারে তার সার্কিট ছাদে বন্ধ হয়েছে — স্বাভাবিকের এক-তৃতীয়াংশ ভলিউম। এর বডি বড় কারণ এক্সচেঞ্জ দাম থামিয়েছে, ক্রেতারা বিক্রেতাদের অভিভূত করেছেন বলে নয়, আর খালি বইয়ে ঠেকা গুটিকয়েক লট নির্ভরযোগ্যভাবে ঐ আকৃতি তৈরি করবে। আশি শতাংশের বারটি আঠারো লক্ষ পঞ্চাশ হাজার শেয়ার, গড়ের প্রায় তিন গুণ, লেনদেন করেছে এবং এমন একটি ছাদের এক দশমিক এক দুই শতাংশ নিচে থেমেছে যেখানে পৌঁছাতে সে সম্পূর্ণ স্বাধীন ছিল। ঐ ফাঁকটিই গুরুত্বপূর্ণ প্রমাণ: দাম আরও যেতে পারত ও যায়নি, যা আকৃতিটিকে একটি কৃত্রিম ফল নয়, একটি সিদ্ধান্ত করে। তাই আমার উত্তর হলো বডি অনুপাত একা দৃঢ়তা নয়। দৃঢ়তা মানে বড় বডি এবং অব্যবহৃত ফাঁক এবং ভলিউম, আর তিনটির কেবল প্রথমটি দিলে আমি কিছু ক্রমবদ্ধ করার আগে বাকি দুটি চাইব।',
+      },
+    },
+    {
+      q: {
+        en: 'Why must the classification thresholds be tested in a strict order?',
+        bn: 'শ্রেণিবিভাজনের সীমাগুলো কেন কঠোর ক্রমে পরীক্ষা করতে হবে?',
+      },
+      a: {
+        en: 'Because the conditions overlap, so the order determines which name a candle receives. The clearest case is marubozu against strong body: marubozu requires a body ratio of ninety or above, and strong body requires seventy or above, so every marubozu satisfies both. Test the weaker condition first and the classifier returns strong body for everything and no marubozu is ever named — and crucially it produces no error, just plausible output that is quietly missing a category. The same applies at the small-body end, where hammer, shooting star and spinning top all sit under a body ratio of thirty-five and are separated only by where the shadows fall, so those three have to be tested against each other before the generic case. And zero range has to come first of all, because a four-price bar would otherwise divide by zero in every ratio and take the sheet down. The general principle is that the most specific condition is tested first and the most permissive last, which is the same discipline as ordering exception handlers from narrow to broad.',
+        bn: 'কারণ শর্তগুলো পরস্পরের সঙ্গে ছেদ করে, তাই ক্রমটিই ঠিক করে একটি ক্যান্ডেল কোন নাম পাবে। সবচেয়ে স্পষ্ট ক্ষেত্র marubozu বনাম strong body: marubozu-র জন্য বডি অনুপাত নব্বই বা তার ওপরে লাগে, আর strong body-র জন্য সত্তর বা তার ওপরে, তাই প্রতিটি marubozu দুটোই পূরণ করে। দুর্বলতর শর্ত আগে পরীক্ষা করুন আর শ্রেণিবিভাজক সবকিছুতেই strong body ফেরত দেয় ও কোনো marubozu কখনো নাম পায় না — আর গুরুত্বপূর্ণভাবে এটি কোনো ভুল তৈরি করে না, কেবল বিশ্বাসযোগ্য আউটপুট যাতে নীরবে একটি শ্রেণি অনুপস্থিত। ছোট-বডির প্রান্তেও একই প্রযোজ্য, যেখানে hammer, shooting star ও spinning top সবই পঁয়ত্রিশ বডি অনুপাতের নিচে বসে ও কেবল শ্যাডো কোথায় পড়ে তাতে আলাদা হয়, তাই ঐ তিনটিকে সাধারণ ক্ষেত্রের আগে পরস্পরের বিপরীতে পরীক্ষা করতে হয়। আর শূন্য রেঞ্জকে সবার আগে আসতে হয়, কারণ নইলে চার-দামের বার প্রতিটি অনুপাতে শূন্য দিয়ে ভাগ করে শিট ফেলে দেবে। সাধারণ নীতি হলো সবচেয়ে সুনির্দিষ্ট শর্ত আগে ও সবচেয়ে উদার শর্ত শেষে পরীক্ষা করা, যা ব্যতিক্রম হ্যান্ডলার সংকীর্ণ থেকে প্রশস্ত ক্রমে সাজানোরই শৃঙ্খলা।',
+      },
+    },
+    {
+      q: {
+        en: 'A candle shows a small body with a long lower shadow. Is that a hammer?',
+        bn: 'একটি ক্যান্ডেলে ছোট বডি ও লম্বা লোয়ার শ্যাডো। এটি কি একটি hammer?',
+      },
+      a: {
+        en: 'The geometry qualifies, but the geometry does not carry the name. That identical shape is a hammer if it appears after a decline and a hanging man if it appears after an advance, and those are opposite readings of the same four numbers. So the honest answer is that I cannot name it until I know what preceded it. What the shape does tell me, independently of location, is the sequence within the session: price fell substantially, then buyers recovered nearly all of it before the close. After a decline that recovery is potentially exhaustion of the sellers; after an advance the same recovery means the session probed lower and the buyers who rescued it may be the last ones available. The mechanics are identical and the implication inverts. The same problem appears at the other end with shooting star and inverted hammer, which are also a single geometry with two names. This is why I treat location as half the identification rather than as a refinement applied afterwards — a shape named without its trend has not actually been identified.',
+        bn: 'জ্যামিতি যোগ্য, কিন্তু জ্যামিতি নামটি বহন করে না। ঐ অভিন্ন আকৃতি পতনের পর দেখা দিলে hammer আর উত্থানের পর দেখা দিলে hanging man, আর ঐ দুটি একই চারটি সংখ্যার বিপরীত পাঠ। তাই সৎ উত্তর হলো এর আগে কী ছিল না জানা পর্যন্ত আমি নাম দিতে পারি না। অবস্থান নির্বিশেষে আকৃতিটি আমাকে যা বলে তা হলো সেশনের ভেতরের ক্রম: দাম উল্লেখযোগ্যভাবে পড়েছে, তারপর ক্লোজের আগে ক্রেতারা তার প্রায় পুরোটা পুনরুদ্ধার করেছেন। পতনের পর ঐ পুনরুদ্ধার সম্ভাব্যভাবে বিক্রেতাদের নিঃশেষ হওয়া; উত্থানের পর একই পুনরুদ্ধারের অর্থ সেশনটি নিচে খুঁজে দেখেছে আর যে ক্রেতারা একে উদ্ধার করেছেন তাঁরাই হয়তো শেষ উপলব্ধ ক্রেতা। যান্ত্রিকতা অভিন্ন আর তাৎপর্য উল্টে যায়। অন্য প্রান্তে shooting star ও inverted hammer-এও একই সমস্যা, যারাও দুই নামের একটি জ্যামিতি। সেজন্যই আমি অবস্থানকে পরে প্রয়োগ করা পরিমার্জন না ভেবে শনাক্তকরণের অর্ধেক ধরি — ট্রেন্ড ছাড়া নাম দেওয়া আকৃতি আসলে শনাক্ত হয়নি।',
+      },
+    },
+    {
+      q: {
+        en: 'Why does your validity gate discard some limit-touched bars but not all of them?',
+        bn: 'আপনার বৈধতা-গেট কিছু সীমা-স্পর্শী বার বাতিল করে কিন্তু সবগুলো নয় কেন?',
+      },
+      a: {
+        en: 'Because touching the limit and being uninformative are not the same thing, and a gate that conflated them would throw away real information. The condition I use is limit touched and volume below average, both together. The reasoning is that a limit-up on three times average volume absorbed genuine capital at the ceiling — a large number of participants transacted at that price, and the fact that the band stopped further movement does not erase what was traded. A limit-up on a third of average volume is the opposite: a handful of lots hitting a book with no offers in it, which will lock the price without anyone significant having changed their mind. Chapter twenty-six has the pair side by side, where one limit-up absorbed one point one eight million shares and the next one moved the same percentage on forty-two thousand — three point six percent of the previous day\'s volume — and the session after that fell eight percent on the highest volume of the sample. So volume is what separates absorption from an air pocket, and the gate has to consult it. What I do concede is that even a high-volume limit bar has a distorted shape, since the price stopped where the rule stopped it, so I read it as an event rather than as conviction geometry.',
+        bn: 'কারণ সীমা স্পর্শ করা আর তথ্যহীন হওয়া এক নয়, আর যে গেট এদের মিলিয়ে ফেলত সে প্রকৃত তথ্য ফেলে দিত। আমি যে শর্ত ব্যবহার করি তা হলো সীমা স্পর্শিত এবং ভলিউম গড়ের নিচে, দুটোই একসঙ্গে। যুক্তি হলো গড়ের তিন গুণ ভলিউমে limit-up ছাদে প্রকৃত পুঁজি শোষণ করেছে — বিপুল সংখ্যক অংশগ্রহণকারী ঐ দামে লেনদেন করেছেন, আর ব্যান্ড আরও চলাচল থামিয়েছে বলে যা লেনদেন হয়েছে তা মুছে যায় না। গড়ের এক-তৃতীয়াংশ ভলিউমে limit-up ঠিক উল্টো: অফারহীন একটি বইয়ে ঠেকা গুটিকয়েক লট, যা কোনো গুরুত্বপূর্ণ কেউ মত না বদলেই দাম লক করে দেবে। অধ্যায় ছাব্বিশে জোড়াটি পাশাপাশি আছে, যেখানে একটি limit-up এগারো লক্ষ আশি হাজার শেয়ার শোষণ করেছে আর পরেরটি একই শতাংশ নড়েছে বিয়াল্লিশ হাজারে — আগের দিনের ভলিউমের তিন দশমিক ছয় শতাংশ — আর তার পরের সেশনটি নমুনার সর্বোচ্চ ভলিউমে আট শতাংশ পড়েছে। তাই ভলিউমই শোষণকে বায়ুশূন্যতা থেকে আলাদা করে, আর গেটকে তা দেখতে হয়। আমি যা স্বীকার করি তা হলো উচ্চ-ভলিউমের সীমা-বারেরও আকৃতি বিকৃত, যেহেতু দাম যেখানে নিয়ম থামিয়েছে সেখানে থেমেছে, তাই আমি একে দৃঢ়তার জ্যামিতি নয়, একটি ঘটনা হিসেবে পড়ি।',
+      },
+    },
+    {
+      q: {
+        en: 'Your three ratios sum to 103%. What has happened?',
+        bn: 'আপনার তিনটি অনুপাত ১০৩%-এ যোগ হয়। কী ঘটেছে?',
+      },
+      a: {
+        en: 'A data error, not a market event, and I would treat that as certain rather than likely. Body, upper shadow and lower shadow partition the range by construction — the body spans open to close, the upper shadow runs from the higher of those to the high, the lower shadow runs from the lower of those to the low, and between them they cover the range exactly once with no overlap and no gap. So the three percentages sum to a hundred for every bar that has ever traded, and there is no market condition, however unusual, that produces a different total. A sum of a hundred and three means the OHLC row is internally impossible: most often a high below the close or a low above the open, which happens when a feed mixes an adjusted close with unadjusted intraday extremes, or when a corporate action was applied to some fields and not others. What I would do is reject the row at that point rather than repair it, look the session up on the exchange site, and check whether the neighbouring rows share the defect — because a single bad bar is usually a glitch and a run of them is usually an adjustment that was applied inconsistently across the whole series.',
+        bn: 'একটি ডেটা ভুল, বাজারের ঘটনা নয়, আর আমি একে সম্ভাব্য নয়, নিশ্চিত ধরব। বডি, আপার শ্যাডো ও লোয়ার শ্যাডো গঠনগতভাবেই রেঞ্জকে বিভাজন করে — বডি ওপেন থেকে ক্লোজ বিস্তৃত, আপার শ্যাডো ঐ দুটির উচ্চতরটি থেকে হাই পর্যন্ত, লোয়ার শ্যাডো ঐ দুটির নিম্নতরটি থেকে লো পর্যন্ত, আর এরা মিলে রেঞ্জটিকে ঠিক একবার ঢাকে, কোনো ছেদ বা ফাঁক ছাড়া। তাই কখনো লেনদেন হওয়া প্রতিটি বারে তিনটি শতাংশ একশোতে যোগ হয়, আর যত অস্বাভাবিকই হোক এমন কোনো বাজার-অবস্থা নেই যা ভিন্ন যোগফল তৈরি করে। একশো তিন যোগফলের অর্থ OHLC সারিটি অভ্যন্তরীণভাবে অসম্ভব: প্রায়ই ক্লোজের নিচে একটি হাই বা ওপেনের ওপরে একটি লো, যা ঘটে যখন কোনো ফিড একটি সমন্বিত ক্লোজের সঙ্গে অসমন্বিত ইন্ট্রাডে চরম মান মেশায়, বা যখন একটি কর্পোরেট অ্যাকশন কিছু ক্ষেত্রে প্রয়োগ হয়েছে অন্যগুলোতে নয়। আমি যা করব তা হলো ঐ বিন্দুতেই সারিটি বাতিল করা, মেরামত নয়, এক্সচেঞ্জের সাইটে সেশনটি দেখা, আর পাশের সারিগুলোতেও একই ত্রুটি আছে কি না যাচাই করা — কারণ একটি খারাপ বার সাধারণত একটি বিচ্যুতি আর ধারাবাহিক কয়েকটি সাধারণত পুরো সিরিজে অসামঞ্জস্যপূর্ণভাবে প্রয়োগ করা একটি সমন্বয়।',
+      },
+    },
+  ],
+
+  quiz: [
+    {
+      q: {
+        en: 'Which of the four OHLC prices sets tomorrow\'s circuit band?',
+        bn: 'OHLC-এর চারটি দামের কোনটি আগামীকালের সার্কিট ব্যান্ড ঠিক করে?',
+      },
+      options: {
+        en: ['Open', 'High', 'Low', 'Close'],
+        bn: ['Open', 'High', 'Low', 'Close'],
+      },
+      answer: 3,
+    },
+    {
+      q: {
+        en: 'Body + upper shadow + lower shadow must always equal:',
+        bn: 'বডি + আপার শ্যাডো + লোয়ার শ্যাডো সবসময় সমান হতে হবে:',
+      },
+      options: {
+        en: ['The close', 'The range', 'The previous close', 'It varies by candle'],
+        bn: ['ক্লোজ', 'রেঞ্জ', 'আগের ক্লোজ', 'ক্যান্ডেলভেদে বদলায়'],
+      },
+      answer: 1,
+    },
+    {
+      q: {
+        en: 'On the Sunday candle (O 48.20, H 52.10, L 47.60, C 51.80), the body ratio is:',
+        bn: 'রবিবারের ক্যান্ডেলে (O ৪৮.২০, H ৫২.১০, L ৪৭.৬০, C ৫১.৮০) বডি অনুপাত:',
+      },
+      options: {
+        en: ['66.67%', '80.00%', '93.33%', '94.29%'],
+        bn: ['৬৬.৬৭%', '৮০.০০%', '৯৩.৩৩%', '৯৪.২৯%'],
+      },
+      answer: 1,
+    },
+    {
+      q: {
+        en: 'The high and low of a session are best described as:',
+        bn: 'একটি সেশনের হাই ও লো-র সর্বোত্তম বর্ণনা:',
+      },
+      options: {
+        en: [
+          'Consensus prices',
+          'Failure points where one side stopped being able to push',
+          'The most heavily traded prices',
+          'Regulatory reference prices',
+        ],
+        bn: [
+          'ঐকমত্যের দাম',
+          'ব্যর্থতার বিন্দু যেখানে এক পক্ষ আর ঠেলতে পারেনি',
+          'সবচেয়ে বেশি লেনদেন হওয়া দাম',
+          'নিয়ন্ত্রক রেফারেন্স দাম',
+        ],
+      },
+      answer: 1,
+    },
+    {
+      q: {
+        en: 'A limit-touched bar is discarded as unreadable only when:',
+        bn: 'একটি সীমা-স্পর্শী বার অপাঠ্য হিসেবে বাতিল হয় কেবল যখন:',
+      },
+      options: {
+        en: [
+          'It is always discarded',
+          'Volume is also below average',
+          'The body ratio exceeds 90%',
+          'It closes higher than it opened',
+        ],
+        bn: [
+          'এটি সবসময় বাতিল হয়',
+          'ভলিউমও গড়ের নিচে',
+          'বডি অনুপাত ৯০% ছাড়ায়',
+          'এটি ওপেনের চেয়ে উঁচুতে বন্ধ হয়',
+        ],
+      },
+      answer: 1,
+    },
+    {
+      q: {
+        en: 'A four-price doji (open = high = low = close) should be read as:',
+        bn: 'একটি চার-দামের doji (open = high = low = close) পড়া উচিত:',
+      },
+      options: {
+        en: [
+          'Perfect indecision',
+          'A non-observation — a limit lock or an empty book',
+          'A reversal signal',
+          'A continuation signal',
+        ],
+        bn: [
+          'নিখুঁত দ্বিধা',
+          'একটি অ-পর্যবেক্ষণ — সীমা-লক বা খালি বই',
+          'একটি রিভার্সাল সংকেত',
+          'একটি ধারাবাহিকতার সংকেত',
+        ],
+      },
+      answer: 1,
+    },
+    {
+      q: {
+        en: 'Testing the strong-body condition (b ≥ 70) before the marubozu condition (b ≥ 90) results in:',
+        bn: 'marubozu শর্তের (b ≥ ৯০) আগে শক্তিশালী-বডির শর্ত (b ≥ ৭০) পরীক্ষা করলে ফল:',
+      },
+      options: {
+        en: [
+          'A division-by-zero error',
+          'No marubozu is ever named',
+          'Every candle becomes a marubozu',
+          'No effect — the order is arbitrary',
+        ],
+        bn: [
+          'শূন্য দিয়ে ভাগের ভুল',
+          'কোনো marubozu কখনো নাম পায় না',
+          'প্রতিটি ক্যান্ডেল marubozu হয়ে যায়',
+          'কোনো প্রভাব নেই — ক্রমটি যথেচ্ছ',
+        ],
+      },
+      answer: 1,
+    },
+    {
+      q: {
+        en: 'The identical small-body, long-lower-shadow geometry is a hanging man rather than a hammer when it appears:',
+        bn: 'অভিন্ন ছোট-বডি, লম্বা-লোয়ার-শ্যাডো জ্যামিতি hammer না হয়ে hanging man হয় যখন তা দেখা দেয়:',
+      },
+      options: {
+        en: ['After a decline', 'After an advance', 'On high volume', 'At a circuit limit'],
+        bn: ['পতনের পর', 'উত্থানের পর', 'উচ্চ ভলিউমে', 'একটি সার্কিট সীমায়'],
+      },
+      answer: 1,
+    },
+    {
+      q: {
+        en: 'Sunday\'s candle stopped 1.12% below its circuit ceiling. That headroom is evidence that:',
+        bn: 'রবিবারের ক্যান্ডেল তার সার্কিট ছাদের ১.১২% নিচে থেমেছে। ঐ ফাঁক প্রমাণ যে:',
+      },
+      options: {
+        en: [
+          'The stock was weak',
+          'The shape was produced by an auction, not by a rule',
+          'Volume was inadequate',
+          'The band was set incorrectly',
+        ],
+        bn: [
+          'শেয়ারটি দুর্বল ছিল',
+          'আকৃতিটি নিয়ম নয়, একটি নিলাম তৈরি করেছে',
+          'ভলিউম অপর্যাপ্ত ছিল',
+          'ব্যান্ডটি ভুলভাবে নির্ধারিত ছিল',
+        ],
+      },
+      answer: 1,
+    },
+    {
+      q: {
+        en: 'If the three ratios sum to 103%, the correct conclusion is:',
+        bn: 'তিনটি অনুপাত ১০৩%-এ যোগ হলে সঠিক সিদ্ধান্ত:',
+      },
+      options: {
+        en: [
+          'An unusually volatile session',
+          'A corrupt OHLC row',
+          'A limit-locked session',
+          'A rounding artefact to be ignored',
+        ],
+        bn: [
+          'অস্বাভাবিক অস্থির একটি সেশন',
+          'একটি দূষিত OHLC সারি',
+          'একটি সীমা-লক সেশন',
+          'উপেক্ষণীয় একটি গোল করার কৃত্রিম ফল',
+        ],
+      },
+      answer: 1,
+    },
+  ],
 };

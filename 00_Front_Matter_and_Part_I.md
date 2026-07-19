@@ -9,8 +9,8 @@
 
 | Part | Title | Chapters | Status |
 |---|---|---|---|
-| I | Stock Market Foundation | 1–8 | ✅ This volume |
-| II | Fundamental Analysis | 9–25 | Pending |
+| I | Stock Market Foundation | 1–8 |Complete |
+| II | Fundamental Analysis | 9–25 | Complete |
 | III | Technical Analysis | 26–45 | Pending |
 | IV | Professional Trading | 46–55 | Pending |
 | V | Professional Portfolio | 56–62 | Pending |
