@@ -34,6 +34,15 @@ import ch31 from './ch31';
 import ch33 from './ch33';
 import ch34 from './ch34';
 import ch36 from './ch36';
+import ch43 from './ch43';
+import ch39 from './ch39';
+import ch38 from './ch38';
+import ch42 from './ch42';
+import ch40 from './ch40';
+import ch45 from './ch45';
+import ch41 from './ch41';
+import ch37 from './ch37';
+import ch44 from './ch44';
 
 /**
  * Authored chapter content, keyed by chapter number.
@@ -77,6 +86,15 @@ const CONTENT = {
   34: ch34,
   35: ch35,
   36: ch36,
+  43: ch43,
+  38: ch38,
+  39: ch39,
+  42: ch42,
+  40: ch40,
+  45: ch45,
+  41: ch41,
+  37: ch37,
+  44: ch44,
 };
 
 export const getContent = (n) => CONTENT[Number(n)] || null;
